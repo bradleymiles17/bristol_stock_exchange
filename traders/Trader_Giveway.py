@@ -11,10 +11,6 @@ class Trader_Giveaway(Trader):
             order = None
         else:
             quoteprice = self.orders[0].price
-            order = Order(self.tid,
-                          self.orders[0].otype,
-                          quoteprice,
-                          self.orders[0].qty,
-                          time, lob['QID'])
+            order = Order(time, self.tid, self.orders[0].otype, quoteprice, self.orders[0].qty)
             self.lastquote = order
         return order

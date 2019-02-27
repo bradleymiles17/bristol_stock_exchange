@@ -32,6 +32,6 @@ class Trader_Sniper(Trader):
                         quoteprice = limitprice
                 else:
                     quoteprice = lob['asks']['worst']
-            order = Order(self.tid, otype, quoteprice, self.orders[0].qty, time, lob['QID'])
+            order = Order(time, self.tid, otype, quoteprice, self.orders[0].qty)
             self.lastquote = order
         return order

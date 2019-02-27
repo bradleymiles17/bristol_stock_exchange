@@ -22,6 +22,6 @@ class Trader_ZIC(Trader):
             else:
                 quoteprice = random.randint(limit, maxprice)
                 # NB should check it == 'Ask' and barf if not
-            order = Order(self.tid, otype, quoteprice, self.orders[0].qty, time, qid)
+            order = Order(time, self.tid, otype, quoteprice, self.orders[0].qty)
             self.lastquote = order
         return order

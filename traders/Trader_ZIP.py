@@ -58,7 +58,7 @@ class Trader_ZIP(Trader):
             quoteprice = int(self.limit * (1 + self.margin))
             self.price = quoteprice
 
-            order = Order(self.tid, self.job, quoteprice, self.orders[0].qty, time, lob['QID'])
+            order = Order(time, self.tid, self.job, quoteprice, self.orders[0].qty)
             self.lastquote = order
         return order
 

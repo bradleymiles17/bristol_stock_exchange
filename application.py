@@ -7,36 +7,30 @@ from model.Order import Order
 
 # EB looks for an 'application' callable by default.
 
-exchange = Exchange()
+exchange = Exchange(True)
 
 application = FlaskAPI(__name__)
 
 
-@application.route("/")
+@application.route("/api/lob")
 def index():
-    return exchange.publish_lob(True)
+    return exchange.publish_lob()
 
 
-@application.route("/order", methods=["GET"])
-def orders_index(self):
-    return True
+@application.route("/api/order/<uuid>", methods=["GET"])
+def get_order(uuid):
+    return uuid
 
 
-@application.route("/order", methods=["POST"])
-def create_bid(self):
-    lob = self.exchange.publish_lob(True)
+@application.route("/api/order", methods=["POST"])
+def create_order():
+    lob = exchange.publish_lob()
 
     body = request.get_json()
 
-    order = Order(
-        body["trader_id"],
-        body["otype"],
-        body["price"],
-        body["qty"],
-        lob['QID']
-    )
-    [order.qid, response] = self.exchange.add_order(order, True)
-    return response
+    order = Order(lob['QID'], body["trader_id"], body["otype"], body["price"], body["qty"])
+    transaction_record = exchange.process_order(order)
+    return transaction_record
 
 
 # run the app.

@@ -1,3 +1,5 @@
+import sys
+
 # Trader superclass
 # all Traders have a trader id, bank balance, blotter, and list of orders to execute
 class Trader:
