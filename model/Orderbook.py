@@ -40,6 +40,12 @@ class Orderbook_Half:
         else:
             return None
 
+    def get_best_order(self):
+        if len(self.lob) > 0:
+            return self.lob[self.get_best_price()].orders[0]
+        else:
+            return None
+
     def get_best_tid(self):
         if len(self.lob) > 0:
             return self.lob[self.get_best_price()].orders[0].tid
@@ -115,12 +121,16 @@ class Orderbook_Half:
     # delete order from the dictionary holding the orders
     # assumes max of one order per trader per list
     # checks that the Quote ID does actually exist in the dict before deletion
-    def book_del(self, order):
-        # print('book_del %s',self.orders)
-        if self.orders.get(order.qid) is not None:
-            del (self.orders[order.qid])
+    def book_del(self, order_qid):
+        if self.orders.get(order_qid) is not None:
+            del (self.orders[order_qid])
             self.build_lob()
-        # print('book_del %s', self.orders)
+
+    def delete_order(self, order):
+        lob = self.lob[order.price]
+
+        self.build_lob()
+        return lob
 
     # delete order: when the best bid/ask has been hit, delete it from the book
     # the TraderID of the deleted order is return-value, as counterparty to the trade

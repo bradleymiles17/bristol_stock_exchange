@@ -10,103 +10,88 @@ class Exchange(Orderbook):
         super().__init__()
         self.verbose = debug
 
-    # add a quote/order to the exchange and update all internal records; return unique i.d.
-    def add_order(self, order):
-        order.qid = self.quote_id
-        self.quote_id = order.qid + 1
-        # if verbose : print('QUID: order.quid=%d self.quote.id=%d' % (order.qid, self.quote_id))
-
-        if order.otype == Order.BID:
-            response = self.bids.book_add(order)
-        elif order.otype == Order.ASK:
-            response = self.asks.book_add(order)
-        else:
-            sys.exit('add_order() given neither Bid nor Ask')
-
-        return response
-
     # receive an order and either add it to the relevant LOB (ie treat as limit order)
     # or if it crosses the best counterparty offer, execute it (treat as a market order)
     def process_order(self, order):
-        counter_party, price = None, None
 
-        response = self.add_order(order)  # add it to the order lists -- overwriting any previous order
+        # add a quote/order to the exchange and update all internal records; return unique i.d.
+        def add_order(order):
+            order.qid = self.quote_id
+            self.quote_id = order.qid + 1
+            # if verbose : print('QUID: order.quid=%d self.quote.id=%d' % (order.qid, self.quote_id))
+
+            if order.otype == Order.BID:
+                book = self.bids
+            elif order.otype == Order.ASK:
+                book = self.asks
+            else:
+                sys.exit('add_order() given neither Bid nor Ask')
+
+            return book.book_add(order)
+
+        def process_transaction(order, counter_party_order):
+            transaction_time = time.time()
+            if self.verbose:
+                print('>>>>>>>>>>>>>>>>>TRADE t=%5.2f $%d %s %s' % (
+                    transaction_time, counter_party_order.price, counter_party_order.tid, order.tid))
+
+            transaction_record = {
+                'type': 'Trade',
+                'time': transaction_time,
+                'price': counter_party_order.price,
+                'party1': counter_party_order.tid,
+                'party2': order.tid,
+                'qty': order.qty
+            }
+
+            self.tape.append(transaction_record)
+
+            return transaction_record
+
+        transactions = []
+        response = add_order(order)
 
         if self.verbose:
             print('QUID: order.quid=%d' % order.qid)
             print('RESPONSE: %s' % response)
 
-        best_ask = self.asks.get_best_price()
-        best_ask_tid = self.asks.get_best_tid()
-        best_bid = self.bids.get_best_price()
-        best_bid_tid = self.bids.get_best_tid()
+        best_bid = self.bids.get_best_order()
+        best_ask = self.asks.get_best_order()
 
-        if order.otype == Order.BID:
-            if self.asks.get_qty() > 0 and best_bid >= best_ask:
-                # bid lifts the best ask
+        if order.otype == Order.BID and self.asks.get_qty() > 0:
+            if best_bid.price >= best_ask.price and best_bid.qty <= best_ask.qty:
                 if self.verbose:
                     print("Bid $%s lifts best ask" % order.price)
 
-                counter_party = best_ask_tid
-                price = best_ask  # bid crossed ask, so use ask price
+                transaction = process_transaction(order, best_ask)
+                transactions.append(transaction)
 
-                if self.verbose:
-                    print('counterparty, price', counter_party, price)
+                # if best_bid.qty == best_ask.qty:
+                #     self.del_order()
 
-                # delete the ask just crossed
-                self.asks.delete_best()
-                # delete the bid that was the latest order
-                self.bids.delete_best()
-        elif order.otype == Order.ASK:
-            if self.bids.get_qty() > 0 and best_ask <= best_bid:
+                # update best_ask qty
+                # self.bids.delete_best()
+                # self.asks.delete_best()
+
+        elif order.otype == Order.ASK and self.bids.get_qty() > 0:
+            if best_ask.price <= best_bid.price and best_ask.qty <= best_bid.qty:
                 # ask hits the best bid
                 if self.verbose:
                     print("Ask $%s hits best bid" % order.price)
 
-                # remove the best bid
-                counter_party = best_bid_tid
-                price = best_bid  # ask crossed bid, so use bid price
+                transaction = process_transaction(order, best_bid)
+                transactions.append(transaction)
 
-                if self.verbose:
-                    print('counterparty, price', counter_party, price)
+                # update best_bid qty
+                # self.bids.delete_best()
+                # self.asks.delete_best()
 
-                # delete the bid just crossed, from the exchange's records
-                self.bids.delete_best()
-                # delete the ask that was the latest order, from the exchange's records
-                self.asks.delete_best()
-        else:
-            # we should never get here
-            sys.exit('process_order() given neither Bid nor Ask')
-
-        # NB at this point we have deleted the order from the exchange's records
-        # but the two traders concerned still have to be notified
-        if self.verbose:
-            print('counterparty %s' % counter_party)
-
-        if counter_party is not None and price is not None:
-            # process the trade
-
-            transaction_time = time.time()
-            if self.verbose:
-                print('>>>>>>>>>>>>>>>>>TRADE t=%5.2f $%d %s %s' % (transaction_time, price, counter_party, order.tid))
-
-            transaction_record = {
-                'type': 'Trade',
-                'time': transaction_time,
-                'price': price,
-                'party1': counter_party,
-                'party2': order.tid,
-                'qty': order.qty
-            }
-            self.tape.append(transaction_record)
-            return transaction_record
-        else:
-            return "No transaction occurred"
+        return transactions
 
     # delete a trader's quot/order from the exchange, update all internal records
     def del_order(self, order):
         if order.otype == Order.BID:
-            self.bids.book_del(order)
+            self.bids.book_del(order.qid)
             if self.bids.get_qty() > 0:
                 best_price = self.bids.lob_anon[-1][0]
                 self.bids.best_price = best_price
@@ -118,7 +103,7 @@ class Exchange(Orderbook):
             self.tape.append(cancel_record)
 
         elif order.otype == Order.ASK:
-            self.asks.book_del(order)
+            self.asks.book_del(order.qid)
             if self.asks.get_qty() > 0:
                 best_price = self.asks.lob_anon[0][0]
                 self.asks.best_price = best_price
