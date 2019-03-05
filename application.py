@@ -12,14 +12,19 @@ exchange = Exchange(True)
 application = FlaskAPI(__name__)
 
 
+@application.route("/")
+def index():
+    return exchange.publish_lob()
+
+
+@application.route("/api/lob")
+def publish_lob():
+    return exchange.publish_lob()
+
+
 @application.route("/api/orders")
 def publish_orders():
     return exchange.publish_orders()
-
-
-@application.route("/api/anon_lob")
-def publish_lob():
-    return exchange.publish_lob()
 
 
 @application.route("/api/order", methods=["POST"])
