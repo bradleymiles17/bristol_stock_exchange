@@ -1,3 +1,6 @@
+from .Order import Order
+
+
 # Orderbook_half is one side of the book: a list of bids or a list of asks, each sorted best-first
 class Orderbook_Half:
 
@@ -13,14 +16,27 @@ class Orderbook_Half:
         self.__worst_price = worst_price
         self.lob_depth = 0  # how many different prices on lob?
 
-    def book_add(self, order):
+    def book_get(self, qid: int) -> Order:
+        return self.orders.get(qid)
+
+    def book_add(self, order: Order):
         self.orders[order.qid] = order
-
         self.build_lob()
+        return True
 
-    def book_remove(self, order):
-        del self.orders[order.qid]
-        self.build_lob()
+    def book_remove_by_id(self, qid: int) -> bool:
+        if self.orders.get(qid) is not None:
+            del self.orders[qid]
+            self.build_lob()
+            return True
+        return False
+
+    def book_remove(self, order: Order) -> bool:
+        if self.orders.get(order.qid) is not None:
+            del self.orders[order.qid]
+            self.build_lob()
+            return True
+        return False
 
     def get_best_price(self):
         if len(self.lob) > 0:
@@ -39,12 +55,6 @@ class Orderbook_Half:
     def get_best_order(self):
         if len(self.lob) > 0:
             return self.lob[self.get_best_price()][0]
-        else:
-            return None
-
-    def get_best_tid(self):
-        if len(self.lob) > 0:
-            return self.lob[self.get_best_price()][0].tid
         else:
             return None
 
@@ -69,16 +79,13 @@ class Orderbook_Half:
     # NB for asks, the sorting should be reversed
     def get_anonymize_lob(self):
         lob_anon = []
-        for price in sorted(self.lob):
+        for price in sorted(self.lob, reverse=True) if self.is_buy else sorted(self.lob):
 
             qty = 0
             for order in self.lob[price]:
                 qty += order.qty
 
             lob_anon.append([price, qty])
-
-        if not self.is_buy:
-            lob_anon.reverse()
 
         return lob_anon
 

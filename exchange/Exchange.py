@@ -28,27 +28,33 @@ class Exchange:
             return False
 
         if isinstance(request, NewOrder):
-            current_time = time.time()
-
             if is_invalid_request(request):
-                self.transaction_observer(Rejected(current_time, "Invalid Order", request))
+                self.transaction_observer(Rejected(time.time(), "Invalid Order", request))
             else:
-                self.transaction_observer(Acknowledged(current_time, request))
+                self.transaction_observer(Acknowledged(time.time(), request))
                 order_book_order = Order(
+                    self.lob.get_next_quote_id(),
                     request.timestamp,
-                    self.lob.get_next_quote_id(),  # order_id
                     request.trader_id,
                     request.symbol,
                     request.is_buy,
-                    request.price,
                     request.qty,
+                    request.price,
                     request
                 )
                 self.process_new_order(order_book_order)
         elif isinstance(request, Cancel):
             print("Cancel Request")
+
+            removed_bid = self.lob.bids.book_remove_by_id(request.qid)
+            removed_ask = self.lob.bids.book_remove_by_id(request.qid)
+
+            if removed_ask or removed_bid:
+                self.transaction_observer(Acknowledged(time.time(), request))
+            else:
+                self.transaction_observer(Rejected(time.time(), "Order not found", request))
         elif isinstance(request, Amend):
-            print("Amend Request")
+            print ("Amend Request")
 
     def process_new_order(self, order_book_order: Order):
 

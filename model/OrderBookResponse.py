@@ -7,11 +7,11 @@ class OrderBookResponse:
 
 
 class Filled(OrderBookResponse):
-    def __init__(self, timestamp, price, qty, order: List[NewOrder]):
+    def __init__(self, timestamp, price, qty, requests: List[NewOrder]):
         self.timestamp = timestamp
         self.price = price
         self.qty = qty
-        self.order = order
+        self.requests = requests
 
     def __str__(self):
         return 'FILLED (%5.2f): [P=%.2f Q=%s]' % \

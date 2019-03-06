@@ -2,7 +2,7 @@ from flask import request
 from flask_api import FlaskAPI
 
 from exchange.Exchange import Exchange
-from model.OrderBookRequest import NewOrder
+from model.OrderBookRequest import NewOrder, Cancel
 
 
 # EB looks for an 'application' callable by default.
@@ -22,19 +22,27 @@ def publish_lob():
     return exchange.publish_lob()
 
 
-@application.route("/api/orders")
-def publish_orders():
+@application.route("/api/orders", methods=["GET"])
+def view_orders():
     return exchange.publish_orders()
 
 
-@application.route("/api/order", methods=["POST"])
-def create_order():
+@application.route("/api/orders/<int:order_id>/cancel", methods=["POST"])
+def cancel_order(order_id: int):
+    cancel_request = Cancel(order_id)
+    exchange.process_order_book_request(cancel_request)
+
+    return "Cancelled"
+
+
+@application.route("/api/orders", methods=["POST"])
+def place_order():
     body = request.get_json()
 
-    order_request = NewOrder(body["trader_id"], body["symbol"], body["qty"], body["is_buy"], body["price"])
+    order_request = NewOrder(body["trader_id"], body["symbol"], body["is_buy"], body["qty"], body["price"])
     exchange.process_order_book_request(order_request)
 
-    return "Success"
+    return "Acknowledged"
 
 
 # run the app.
