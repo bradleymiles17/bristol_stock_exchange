@@ -16,22 +16,29 @@ class Orderbook_Half:
         self.__worst_price = worst_price
         self.lob_depth = 0  # how many different prices on lob?
 
-    def book_get(self, qid: int) -> Order:
+    def get_order_by_id(self, qid: int) -> Order:
         return self.orders.get(qid)
 
-    def book_add(self, order: Order):
+    def get_orders(self):
+        orders = []
+        for id in self.orders:
+            orders.append(str(self.orders[id]))
+
+        return orders
+
+    def add_order(self, order: Order):
         self.orders[order.qid] = order
         self.build_lob()
         return True
 
-    def book_remove_by_id(self, qid: int) -> bool:
+    def delete_order_by_id(self, qid: int) -> bool:
         if self.orders.get(qid) is not None:
             del self.orders[qid]
             self.build_lob()
             return True
         return False
 
-    def book_remove(self, order: Order) -> bool:
+    def delete_order(self, order: Order) -> bool:
         if self.orders.get(order.qid) is not None:
             del self.orders[order.qid]
             self.build_lob()
@@ -58,6 +65,9 @@ class Orderbook_Half:
         else:
             return None
 
+    def get_order_n(self):
+        return len(self.orders)
+
     def get_qty(self):
         qty = 0
         for qid in self.orders:
@@ -67,13 +77,6 @@ class Orderbook_Half:
 
     def is_empty(self):
         return len(self.orders) == 0
-
-    def get_orders(self):
-        retVal = []
-        for id in self.orders:
-            retVal.append(str(self.orders[id]))
-
-        return retVal
 
     # anonymize a lob, strip out order details, format as a sorted list
     # NB for asks, the sorting should be reversed
@@ -121,3 +124,14 @@ class Orderbook:
         id = self.quote_id
         self.quote_id = self.quote_id + 1
         return id
+
+    def get_order_by_id(self, qid: int):
+        bid = self.bids.get_order_by_id(qid)
+        ask = self.asks.get_order_by_id(qid)
+
+        if bid is not None:
+            return bid
+        elif ask is not None:
+            return ask
+        else:
+            return None

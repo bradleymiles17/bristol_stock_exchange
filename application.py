@@ -1,15 +1,18 @@
 from flask import request
 from flask_api import FlaskAPI
+from flask_socketio import SocketIO
 
 from exchange.Exchange import Exchange
 from model.OrderBookRequest import NewOrder, Cancel
 
-
 # EB looks for an 'application' callable by default.
 
-exchange = Exchange(True)
-
 application = FlaskAPI(__name__)
+application.config["DEBUG"] = True
+application.config['SECRET_KEY'] = 'secret!'
+socketio = SocketIO(application)
+
+exchange = Exchange(True, socketio)
 
 
 @application.route("/")
@@ -25,6 +28,16 @@ def publish_lob():
 @application.route("/api/orders", methods=["GET"])
 def view_orders():
     return exchange.publish_orders()
+
+
+@application.route("/api/orders/<int:order_id>", methods=["GET"])
+def get_order(order_id: int):
+    order = exchange.lob.get_order_by_id(order_id)
+
+    if order is not None:
+        return str(order)
+    else:
+        return "Order id does not exist"
 
 
 @application.route("/api/orders/<int:order_id>/cancel", methods=["POST"])
@@ -49,4 +62,4 @@ def place_order():
 if __name__ == "__main__":
     # Setting debug to True enables debug output. This line should be
     # removed before deploying a production app.
-    application.run(debug=True)
+    socketio.run(application)

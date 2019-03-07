@@ -2,27 +2,30 @@ from model.Orderbook import Orderbook
 from model.Order import Order
 from model.OrderBookRequest import *
 from model.OrderBookResponse import *
+from model.MarketDataEvent import *
 
 
 # Exchange's internal orderbook
 class Exchange:
     lob = Orderbook("BAM")
 
+    # REFACTOR INTO UDP BROADCAST
     def transaction_observer(self, response: OrderBookResponse):
+        self.socketio.emit('transaction_observer', str(response), broadcast=True)
         print(response)
 
-    # def marketdata_observer(self respnse: ):
+    def marketdata_observer(self, market_data: MarketDataEvent):
+        self.socketio.emit('market_data', str(market_data), broadcast=True)
+        print(market_data)
 
     volume = 0
 
-    def __init__(self, debug):
+    def __init__(self, debug, socketio):
         super().__init__()
         self.verbose = debug
+        self.socketio = socketio
 
-    # new order
-    # cancel
-    # amend
-    def process_order_book_request(self, request):
+    def process_order_book_request(self, request: OrderBookRequest):
 
         def is_invalid_request(request):
             return False
@@ -42,21 +45,22 @@ class Exchange:
                     request.price,
                     request
                 )
-                self.process_new_order(order_book_order)
+                self.__process_new_order(order_book_order)
         elif isinstance(request, Cancel):
             print("Cancel Request")
 
-            removed_bid = self.lob.bids.book_remove_by_id(request.qid)
-            removed_ask = self.lob.bids.book_remove_by_id(request.qid)
+            removed_bid = self.lob.bids.delete_order_by_id(request.qid)
+            removed_ask = self.lob.bids.delete_order_by_id(request.qid)
 
             if removed_ask or removed_bid:
                 self.transaction_observer(Acknowledged(time.time(), request))
+                self.__update_BBO()
             else:
                 self.transaction_observer(Rejected(time.time(), "Order not found", request))
         elif isinstance(request, Amend):
             print ("Amend Request")
 
-    def process_new_order(self, order_book_order: Order):
+    def __process_new_order(self, order_book_order: Order):
 
         def is_limit_order_executable(order, opposite_order):
             if order.is_buy:
@@ -72,19 +76,19 @@ class Exchange:
         # LIMIT ORDER
         if order_book_order.price is not None:
             if opposite_book.is_empty() or (not is_limit_order_executable(order_book_order, opposite_book.get_best_order())):
-                order_book.book_add(order_book_order)
-                # updateBBO()
+                order_book.add_order(order_book_order)
+                self.__update_BBO()
             else:
-                self.match_order(order_book_order, opposite_book)
+                self.__match_order(order_book_order, opposite_book)
 
         # MARKER ORDER
         else:
             if opposite_book.is_empty():
                 self.transaction_observer(Rejected(current_time, "No opposing orders in queue", order_book_order.request))
             else:
-                self.match_order(order_book_order, opposite_book)
+                self.__match_order(order_book_order, opposite_book)
 
-    def match_order(self, order: Order, opposite_book):
+    def __match_order(self, order: Order, opposite_book):
         opposite_order = opposite_book.get_best_order()
 
         currentTime = time.time()
@@ -94,29 +98,36 @@ class Exchange:
             self.volume += order.qty
 
             self.transaction_observer(Filled(currentTime, order.price, order.qty, [order.request, opposite_order.request]))
-            # self.marketdataObserver(LastSalePrice(currentTime, order.symbol, order.price, order.qty, volume))
+            self.marketdata_observer(LastSalePrice(currentTime, order.symbol, order.price, order.qty, self.volume))
+            self.__update_BBO()
 
         elif order.qty > opposite_order.qty:
-            opposite_book.book_remove(opposite_order)
+            opposite_book.delete_order(opposite_order)
 
             order.qty = order.qty - opposite_order.qty
 
-            self.volume += order.qty
+            self.volume += opposite_order.qty
 
-            self.transaction_observer(Filled(currentTime, order.price, opposite_order.qty, [order.request, opposite_order.request]))
-            # self.marketdataObserver(LastSalePrice(currentTime, order.symbol, order.price, order.qty, volume))
-
-            self.process_new_order(order)
+            self.transaction_observer(Filled(currentTime, opposite_order.price, opposite_order.qty, [order.request, opposite_order.request]))
+            self.marketdata_observer(LastSalePrice(currentTime, order.symbol, opposite_order.price, opposite_order.qty, self.volume))
+            self.__update_BBO()
+            self.__process_new_order(order)
 
         else:
-            opposite_book.book_remove(opposite_order)
+            opposite_book.delete_order(opposite_order)
 
             self.volume += order.qty
 
             self.transaction_observer(
                 Filled(currentTime, order.price, order.qty, [order.request, opposite_order.request])
             )
-            # self.marketdataObserver(LastSalePrice(currentTime, order.symbol, order.price, order.qty, self.volume))
+            self.marketdata_observer(LastSalePrice(currentTime, order.symbol, order.price, order.qty, self.volume))
+            self.__update_BBO()
+
+    def __update_BBO(self):
+        # self.marketdata_observer(BBOChange(time.time(), this.symbol, bidPrice, bidQty, offerPrice, offerQty))
+        return True
+
 
     def publish_orders(self):
         public_data = {
@@ -134,12 +145,14 @@ class Exchange:
             'bids': {
                 'best': self.lob.bids.get_best_price(),
                 'worst': self.lob.bids.get_worst_price(),
+                'order_n': self.lob.bids.get_order_n(),
                 'qty': self.lob.bids.get_qty(),
                 'lob': self.lob.bids.get_anonymize_lob()
             },
             'asks': {
                 'best': self.lob.asks.get_best_price(),
                 'worst': self.lob.asks.get_worst_price(),
+                'order_n': self.lob.asks.get_order_n(),
                 'qty': self.lob.asks.get_qty(),
                 'lob': self.lob.asks.get_anonymize_lob()
             },
