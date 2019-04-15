@@ -1,18 +1,16 @@
 from flask import request
 from flask_api import FlaskAPI
-from flask_socketio import SocketIO
 
 from exchange.Exchange import Exchange
-from model.OrderBookRequest import NewOrder, Cancel
+from exchange.model.OrderBookRequest import NewOrder, Cancel
 
 # EB looks for an 'application' callable by default.
 
 application = FlaskAPI(__name__)
 application.config["DEBUG"] = True
 application.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(application)
 
-exchange = Exchange(True, socketio)
+exchange = Exchange(application.config["DEBUG"])
 
 
 @application.route("/")
@@ -62,4 +60,4 @@ def place_order():
 if __name__ == "__main__":
     # Setting debug to True enables debug output. This line should be
     # removed before deploying a production app.
-    socketio.run(application)
+    application.run()

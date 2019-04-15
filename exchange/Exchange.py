@@ -1,8 +1,8 @@
-from model.Orderbook import Orderbook
-from model.Order import Order
-from model.OrderBookRequest import *
-from model.OrderBookResponse import *
-from model.MarketDataEvent import *
+from exchange.model.Orderbook import Orderbook
+from exchange.model.Order import Order
+from exchange.model.OrderBookRequest import *
+from exchange.model.OrderBookResponse import *
+from exchange.model.MarketDataEvent import *
 
 
 # Exchange's internal orderbook
@@ -11,19 +11,16 @@ class Exchange:
 
     # REFACTOR INTO UDP BROADCAST
     def transaction_observer(self, response: OrderBookResponse):
-        self.socketio.emit('transaction_observer', str(response), broadcast=True)
         print(response)
 
     def marketdata_observer(self, market_data: MarketDataEvent):
-        self.socketio.emit('market_data', str(market_data), broadcast=True)
         print(market_data)
 
     volume = 0
 
-    def __init__(self, debug, socketio):
+    def __init__(self, debug):
         super().__init__()
         self.verbose = debug
-        self.socketio = socketio
 
     def process_order_book_request(self, request: OrderBookRequest):
 
@@ -127,7 +124,6 @@ class Exchange:
     def __update_BBO(self):
         # self.marketdata_observer(BBOChange(time.time(), this.symbol, bidPrice, bidQty, offerPrice, offerQty))
         return True
-
 
     def publish_orders(self):
         public_data = {

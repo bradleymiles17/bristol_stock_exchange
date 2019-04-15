@@ -1,5 +1,5 @@
 from typing import List
-from model.OrderBookRequest import OrderBookRequest, NewOrder
+from exchange.model.OrderBookRequest import OrderBookRequest, NewOrder
 
 
 class OrderBookResponse:
